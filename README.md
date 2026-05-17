@@ -136,10 +136,9 @@ Coverage % and test counts look good on slides, but what matters is: *Did this a
 
 This repo documents the decisions, architecture, and sample implementations from that case study.
 
-Coming soon:
-- **/architecture** — System design, testing pyramid, component interactions
-- **/code-samples** — Real-world examples (Page Object Models, fixtures, CI/CD config)
-- **/decisions** — RFC-style documents on key trade-offs
+- **[/architecture](architecture/)** — System design, testing pyramid, execution flow, environment strategy
+- **/code-samples** _(coming soon)_ — Real-world examples (Page Object Models, fixtures, CI/CD config)
+- **/decisions** _(coming soon)_ — RFC-style documents on key trade-offs
 
 ---
 
