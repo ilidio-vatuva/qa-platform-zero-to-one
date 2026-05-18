@@ -1,5 +1,7 @@
 # Decisions
 
+> **Framing.** This folder belongs to a [composite case study](../README.md) — the trade-offs and consequences are real, identifying details (companies, vendor names, exact dates, specific numbers) are generalised. ADR-0008 is the only entry explicitly marked as a hypothetical-future revisit. Everything else describes what was actually decided.
+
 Architecture Decision Records (ADRs) for the QA platform. Each ADR captures **one trade-off** — the context that forced a choice, the choice itself, and what we accepted by making it.
 
 > ADRs are **immutable** once accepted. If a decision changes, a new ADR supersedes the old one. The old one stays in the repo with a `Superseded` status so the evolution is visible.

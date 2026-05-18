@@ -1,6 +1,8 @@
 # QA Platform: Zero to One
 ## Building Quality at Scale for Enterprise Networks
 
+[![code-samples CI](https://github.com/ilidio-vatuva/qa-platform-zero-to-one/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/ilidio-vatuva/qa-platform-zero-to-one/actions/workflows/ci.yml)
+
 > **This is a composite case study** based on real experience building QA infrastructure for critical telecom platforms. Names, specific companies, and proprietary details have been generalized to protect confidentiality. The decisions, challenges, and lessons are authentic.
 
 ---
