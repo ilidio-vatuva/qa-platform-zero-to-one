@@ -1,8 +1,21 @@
 # 05 — CI YAML
 
-> Why the pipeline *is* the quality contract, not the implementation of one.
+> Why the QA pipeline *is* the quality contract, not the implementation of one.
 
 **Code:** [infra/azure-pipelines.yml](../../infra/azure-pipelines.yml) · [infra/Dockerfile.test-runner](../../infra/Dockerfile.test-runner) · [infra/docker-compose.test.yml](../../infra/docker-compose.test.yml)
+
+---
+
+## Which pipeline is this?
+
+This YAML models the **QA pipeline** — the post-deployment pipeline owned by the QA platform team. It is **not** the developer CI/CD.
+
+In the real platform:
+
+- The **dev CI/CD** (separate Azure DevOps project, owned by dev teams) ran build + unit + lint on every PR. Fast. Blocked merge.
+- The **QA pipeline** (this YAML) was triggered after Octopus deployed a main-branch build to staging. It ran API and UI suites against the deployed build. Blocked **release-candidate promotion**, not PR merge.
+
+This split is the load-bearing decision recorded in [ADR-0005](../../../decisions/0005-tests-as-blocking-gates.md) and diagrammed in [test-execution-flow.md](../../../architecture/test-execution-flow.md). Read those if you want the *why*; this walkthrough is the *how*.
 
 ---
 
@@ -10,7 +23,8 @@
 
 ```
 Build            warnings-as-errors → publish workspace artefact
-    ↓
+    ↓            (in the real platform, build lived in the dev CI; reproduced
+                  here for self-containment)
 ApiTests         4 parallel shards, Category!=UI
     ↓
 UiTests          matrix: chrome + firefox, each backed by a service container
@@ -18,7 +32,7 @@ UiTests          matrix: chrome + firefox, each backed by a service container
 ReleaseCandidate main-branch only, deploys to "staging" environment (= approval gate)
 ```
 
-Each stage is a hard gate. Anything red blocks. Override is *possible* — via the Azure DevOps `staging` environment's required-approvers — and recorded, and reviewed in retro. Friction is the point.
+Each stage is a hard gate. Anything red blocks the next stage. Override is *possible* — via the Azure DevOps `staging` environment's required-approvers — and recorded, and reviewed in retro. Friction is the point.
 
 ---
 
@@ -94,7 +108,7 @@ This is the discipline that prevents "works on CI, fails locally" — and its in
 
 ## The pitch in one sentence
 
-The pipeline isn't a script that runs tests; it's the **enforcement layer** that makes the architecture documented in [/architecture](../../../architecture/) real. Without it, every other discipline in this repo is voluntary.
+The QA pipeline isn't a script that runs tests; it's the **enforcement layer** that makes the architecture documented in [/architecture](../../../architecture/) real. The dev CI/CD is the contract for code health; this pipeline is the contract for release readiness. Without both, every other discipline in this repo is voluntary.
 
 ---
 

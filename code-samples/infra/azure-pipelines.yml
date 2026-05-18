@@ -1,8 +1,22 @@
 # Azure DevOps pipeline for the QA platform sample suite.
 #
+# IMPORTANT: this models the **QA pipeline** — the post-deployment
+# pipeline owned by the QA platform team that runs API and UI tests
+# against a deployed build. It is intentionally NOT the developer
+# CI/CD. In the real platform, the dev CI/CD lived in a separate
+# Azure DevOps project, ran build + unit + lint on every PR, and
+# blocked merge. The QA pipeline you see here was triggered after
+# Octopus deployed a main-branch build to staging, and it gated
+# release-candidate promotion — not PR merge.
+#
+# See /architecture/test-execution-flow.md and
+# /decisions/0005-tests-as-blocking-gates.md for the full split.
+#
 # Mirrors the stage-by-stage flow described in
 # /architecture/test-execution-flow.md:
-#   1. Build + unit
+#   1. Build + unit              — modelled here for self-containment;
+#                                  in the real platform this lived in
+#                                  the dev CI/CD project
 #   2. API/integration  \u2014 fanned out across parallel shards
 #   3. UI                \u2014 across browser nodes
 #   4. Quality gate     \u2014 blocking by default, recorded override only

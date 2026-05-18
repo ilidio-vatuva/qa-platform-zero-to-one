@@ -180,10 +180,12 @@ The runner uses [run-shard.sh](infra/run-shard.sh) as its entrypoint — the sam
 
 ## CI pipeline
 
-[infra/azure-pipelines.yml](infra/azure-pipelines.yml) is a working illustration of the flow described in [/architecture/test-execution-flow.md](../architecture/test-execution-flow.md):
+[infra/azure-pipelines.yml](infra/azure-pipelines.yml) models the **QA pipeline** — the post-deployment Azure DevOps pipeline owned by the QA platform team. It is **not** the developer CI/CD; in the real platform, dev CI/CD lived in a separate Azure DevOps project, ran build + unit + lint on every PR, and blocked merge. This YAML reproduces the build stage for self-containment, but its real purpose is the API + UI + RC gate flow that comes after deployment. See [decisions/0005-tests-as-blocking-gates.md](../decisions/0005-tests-as-blocking-gates.md) for the two-pipeline split.
 
-1. **Build** — warnings are errors (`/warnaserror`).
-2. **API / integration** — fanned out across **4 parallel shards**.
+It is a working illustration of the flow described in [/architecture/test-execution-flow.md](../architecture/test-execution-flow.md):
+
+1. **Build** — warnings are errors (`/warnaserror`). *(In the real platform, this lived in the dev CI/CD.)*
+2. **API / integration** — fanned out across **4 parallel shards**, against a deployed build.
 3. **UI** — Chrome + Firefox in a matrix, each backed by a `selenium/standalone-*` service container.
 4. **Release-candidate gate** — main-branch-only, deploys to the `staging` Azure DevOps environment (which is where approvals are configured, not in YAML).
 

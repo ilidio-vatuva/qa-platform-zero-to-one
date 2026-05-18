@@ -28,7 +28,10 @@ A flaky test is worse than no test. Every tool choice (C#, Selenium + POM, JMete
 The test suite was treated with the same discipline as the product: code review, versioning, refactors, deprecation cycles. No "throwaway scripts." If a test wasn't worth maintaining, it wasn't worth writing.
 
 ### 3. The pipeline is the contract
+
 Quality gates lived in CI, not in a person's judgment. The release manager couldn't override a red build with a meeting. This forced the team to invest in test reliability, because the pipeline's authority depended on it.
+
+In practice this was **two pipelines**, not one: a dev CI/CD (per-PR, build + unit) owned by the dev teams, and a separate QA pipeline (post-deploy, API + UI) owned by the QA platform team. They gated different things and they were honest about it. See [test-execution-flow.md](./test-execution-flow.md) and [ADR-0005](../decisions/0005-tests-as-blocking-gates.md).
 
 ### 4. Design for the bad day
 Telecom doesn't tolerate "we'll fix it forward." The architecture assumed: tests *will* fail intermittently, environments *will* drift, a vendor API *will* change without notice. Every component had to fail loudly, diagnose itself, and be cheap to re-run.

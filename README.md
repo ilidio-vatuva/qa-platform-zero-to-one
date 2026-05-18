@@ -7,7 +7,7 @@
 
 ## Context
 
-**2018** — A growing SaaS platform for network operations (RAN automation, multi-vendor management, ML-driven diagnostics) was gaining traction with Tier 1 telecom operators worldwide. The product was doing the job: reducing operational overhead, automating complex network configurations, improving reliability.
+**2020** — A growing SaaS platform for network operations (RAN automation, multi-vendor management, ML-driven diagnostics) was gaining traction with Tier 1 telecom operators worldwide. The product was doing the job: reducing operational overhead, automating complex network configurations, improving reliability.
 
 But there was a problem.
 
@@ -62,13 +62,13 @@ The temptation was to pick the trendiest tool. But in a Tier 1 telecom context, 
 **Decisions:**
 
 - **CI/CD:** Azure DevOps + Octopus Deploy — integrated with the company's existing infrastructure and supported the multi-environment deployment strategy.
-- **Quality Gates:** Automated tests as mandatory blocking gates in the release pipeline — no code merged without passing regression.
+- **Quality Gates (two-pipeline split):** The dev CI/CD (per-PR, dev-team-owned) blocked merge on build + unit tests. A **separate QA pipeline** (post-deployment, QA-team-owned, in its own Azure DevOps project) ran API and UI regression against the deployed build on staging and blocked release-candidate promotion. API and E2E tests never lived on the per-PR dev CI — they were too slow and needed a deployed build. See [decisions/0005](decisions/0005-tests-as-blocking-gates.md).
 - **Parallelization:** Containerized test execution (Docker) + grid strategy to run tests in parallel across multiple agents.
 - **Reporting:** Custom dashboards showing coverage, pass/fail trends, and environment-specific results — not just "red" or "green", but actionable insight.
 
 **Why these choices:**
 
-Azure DevOps was already in use — reinventing this wheel would have been waste. The big decision was making tests *blocking* — it meant developers had to care about quality, not just QA. Parallelization was critical; without it, a 2-hour regression suite would have killed the release cadence.
+Azure DevOps was already in use — reinventing this wheel would have been waste. The big decision was making tests *blocking* — it meant developers had to care about quality, not just QA. The two-pipeline split was the honest org-chart-shaped solution: dev teams owned a fast PR gate, QA owned a deeper post-deploy gate, and the handoff was the Octopus deployment to staging. Parallelization was critical; without it, a 2-hour regression suite would have killed the release cadence.
 
 **Metrics achieved:**
 - Regression suite grew from 20 → 200+ tests
@@ -137,8 +137,8 @@ Coverage % and test counts look good on slides, but what matters is: *Did this a
 This repo documents the decisions, architecture, and sample implementations from that case study.
 
 - **[/architecture](architecture/)** — System design, testing pyramid, execution flow, environment strategy
-- **/code-samples** _(coming soon)_ — Real-world examples (Page Object Models, fixtures, CI/CD config)
-- **/decisions** _(coming soon)_ — RFC-style documents on key trade-offs
+- **[/code-samples](code-samples/)** — Runnable .NET 8 solution (POMs, API client, fixtures, CI/CD) plus narrative walkthroughs
+- **[/decisions](decisions/)** — ADR-style records of the key trade-offs (and one supersession)
 
 ---
 

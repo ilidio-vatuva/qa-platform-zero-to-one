@@ -19,9 +19,13 @@ graph LR
         DATA[Test data factory<br/>builders + cleanup hooks]
     end
 
-    subgraph CI["CI / CD"]
-        ADO[Azure DevOps Pipelines]
+    subgraph CI_DEV["Dev CI / CD (per PR)"]
+        ADO_DEV[Azure DevOps:<br/>build + unit + lint]
         OCTO[Octopus Deploy]
+    end
+
+    subgraph CI_QA["QA pipeline (post-deploy)"]
+        ADO_QA[Azure DevOps:<br/>API + UI sharded]
     end
 
     subgraph EXEC["Execution Grid"]
@@ -47,7 +51,11 @@ graph LR
     CORE --> API_CLIENT
     CORE --> UI_LAYER
     CORE --> DATA
-    ADO --> DOCKER
+    ADO_DEV --> OCTO
+    OCTO --> DEV_ENV
+    OCTO --> STAGE
+    OCTO -.notifies.-> ADO_QA
+    ADO_QA --> DOCKER
     DOCKER --> API_CLIENT
     DOCKER --> UI_LAYER
     UI_LAYER --> SELGRID
@@ -57,8 +65,6 @@ graph LR
     JMETER --> STAGE
     DOCKER --> LOGS
     LOGS --> DASH
-    ADO --> OCTO
-    OCTO --> STAGE
 ```
 
 ---
@@ -93,10 +99,14 @@ Typed C# wrappers over the product's REST surface. This was the **most-used** la
 - Every builder produced data that registered itself for cleanup at teardown.
 - Customer-shaped fixtures (anonymised real topologies) loaded from versioned JSON for high-realism integration tests.
 
-### CI / CD (Azure DevOps + Octopus)
-- Azure DevOps Pipelines orchestrated build, unit tests, API/integration suites, and UI suites as **separate stages**, fanning out to parallel agents.
-- Quality gates were **blocking by default**. The override path existed but required a recorded approval — friction was the point.
-- Octopus Deploy handled multi-environment promotion. The same artefact promoted from dev → staging, never rebuilt; the same artefact then went to the operator-facing canary.
+### CI / CD (two pipelines, by design)
+
+This platform did **not** run API and UI tests on the developer CI/CD. It ran them on a **separate QA pipeline**, owned by the QA platform team, against a deployed build on a shared environment. The split was deliberate — [test-execution-flow.md](./test-execution-flow.md) explains the full sequence and [ADR-0005](../decisions/0005-tests-as-blocking-gates.md) explains the trade-off.
+
+- **Dev CI/CD (Azure DevOps):** per-PR. Build, static analysis, unit tests. Blocks merge. Fast (~3–5 min).
+- **QA pipeline (separate Azure DevOps project):** post-deployment. API/integration suites and UI suites as **separate stages**, fanning out to parallel agents. Blocks release-candidate promotion, not PR merge.
+- **Quality gates were blocking by default** — each pipeline against its own scope. The override path existed but required a recorded approval; friction was the point.
+- **Octopus Deploy** handled multi-environment promotion. The same artefact promoted from dev → staging, never rebuilt; the same artefact then went to the operator-facing canary.
 
 ### Execution grid
 - Docker containers ran the test framework itself; a single image, parameterised by the shard index and target environment.
