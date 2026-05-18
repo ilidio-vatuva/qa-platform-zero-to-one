@@ -1,0 +1,58 @@
+# Local stack for ad-hoc end-to-end runs.
+#
+# What this gives you:
+#   * A Selenium Grid hub + one Chrome node       \u2014 for UI tests
+#   * A fake product API (WireMock standalone)    \u2014 stands in for the real service
+#   * The test runner image                       \u2014 wired to both
+#
+# Usage:
+#   docker compose -f infra/docker-compose.test.yml up --build --abort-on-container-exit
+#
+# This is illustrative \u2014 the real platform replaces the WireMock fake with
+# a docker-composed slice of the actual product. See /architecture/environments.md.
+
+version: "3.9"
+
+services:
+  selenium-hub:
+    image: selenium/hub:4.21
+    container_name: qa-selenium-hub
+    ports:
+      - "4442:4442"
+      - "4443:4443"
+      - "4444:4444"
+
+  chrome:
+    image: selenium/node-chrome:4.21
+    shm_size: 2gb
+    depends_on:
+      - selenium-hub
+    environment:
+      - SE_EVENT_BUS_HOST=selenium-hub
+      - SE_EVENT_BUS_PUBLISH_PORT=4442
+      - SE_EVENT_BUS_SUBSCRIBE_PORT=4443
+      - SE_NODE_MAX_SESSIONS=2
+
+  fake-api:
+    image: wiremock/wiremock:3.5.4
+    container_name: qa-fake-api
+    ports:
+      - "8080:8080"
+    command: ["--port", "8080", "--verbose"]
+
+  test-runner:
+    build:
+      context: ..
+      dockerfile: infra/Dockerfile.test-runner
+    depends_on:
+      - selenium-hub
+      - chrome
+      - fake-api
+    environment:
+      QA_ENVIRONMENT: Local
+      QA_APIBASEURL: http://fake-api:8080
+      QA_SELENIUM_URL: http://selenium-hub:4444/wd/hub
+      SHARD_INDEX: "0"
+      SHARD_TOTAL: "1"
+    volumes:
+      - ./results:/tests/results

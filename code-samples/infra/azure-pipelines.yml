@@ -1,0 +1,136 @@
+# Azure DevOps pipeline for the QA platform sample suite.
+#
+# Mirrors the stage-by-stage flow described in
+# /architecture/test-execution-flow.md:
+#   1. Build + unit
+#   2. API/integration  \u2014 fanned out across parallel shards
+#   3. UI                \u2014 across browser nodes
+#   4. Quality gate     \u2014 blocking by default, recorded override only
+#
+# Sharding strategy: SHARD_TOTAL agents, each agent receives SHARD_INDEX
+# from the matrix job. The run-shard.sh entrypoint picks the matching
+# slice of the suite.
+
+trigger:
+  branches:
+    include: [main]
+pr:
+  branches:
+    include: [main]
+
+variables:
+  buildConfiguration: Release
+  dotnetVersion: 8.0.x
+
+stages:
+# ---------------------------------------------------------------------------
+- stage: Build
+  displayName: Build + unit
+  jobs:
+  - job: build
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - task: UseDotNet@2
+      inputs:
+        packageType: sdk
+        version: $(dotnetVersion)
+    - script: dotnet restore code-samples/QaPlatform.Samples.sln
+      displayName: Restore
+    - script: dotnet build code-samples/QaPlatform.Samples.sln -c $(buildConfiguration) --no-restore /warnaserror
+      displayName: Build (warnings as errors)
+    - publish: code-samples
+      artifact: workspace
+
+# ---------------------------------------------------------------------------
+- stage: ApiTests
+  displayName: API / integration (sharded)
+  dependsOn: Build
+  jobs:
+  - job: api_shards
+    strategy:
+      parallel: 4          # \u2190 SHARD_TOTAL
+    pool:
+      vmImage: ubuntu-latest
+    steps:
+    - download: current
+      artifact: workspace
+    - task: UseDotNet@2
+      inputs:
+        packageType: sdk
+        version: $(dotnetVersion)
+    - script: |
+        dotnet test code-samples/tests/QaPlatform.ApiTests/QaPlatform.ApiTests.csproj \
+          -c $(buildConfiguration) \
+          --filter "Category!=UI" \
+          --logger "trx;LogFileName=api-shard-$(System.JobPositionInPhase).trx" \
+          --results-directory $(Common.TestResultsDirectory)
+      displayName: Run API shard $(System.JobPositionInPhase)/$(System.TotalJobsInPhase)
+      env:
+        QA_ENVIRONMENT: Dev
+    - task: PublishTestResults@2
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: VSTest
+        testResultsFiles: '**/*.trx'
+        testRunTitle: 'API shard $(System.JobPositionInPhase)'
+
+# ---------------------------------------------------------------------------
+- stage: UiTests
+  displayName: UI (Chrome + Firefox)
+  dependsOn: ApiTests
+  jobs:
+  - job: ui
+    strategy:
+      matrix:
+        chrome:  { browser: chrome }
+        firefox: { browser: firefox }
+    pool:
+      vmImage: ubuntu-latest
+    services:
+      selenium: selenium/standalone-$(browser):4.21
+    variables:
+      QA_UI_BASEURL: $(uiBaseUrl)            # set in pipeline variables
+      QA_SELENIUM_URL: http://localhost:4444/wd/hub
+    steps:
+    - download: current
+      artifact: workspace
+    - task: UseDotNet@2
+      inputs:
+        packageType: sdk
+        version: $(dotnetVersion)
+    - script: |
+        dotnet test code-samples/tests/QaPlatform.UiTests/QaPlatform.UiTests.csproj \
+          -c $(buildConfiguration) \
+          --filter "Category=UI" \
+          --logger "trx;LogFileName=ui-$(browser).trx" \
+          --results-directory $(Common.TestResultsDirectory)
+      displayName: UI tests on $(browser)
+    - task: PublishTestResults@2
+      condition: succeededOrFailed()
+      inputs:
+        testResultsFormat: VSTest
+        testResultsFiles: '**/*.trx'
+        testRunTitle: 'UI on $(browser)'
+
+# ---------------------------------------------------------------------------
+# Quality gate.
+#
+# Blocking by default. The Azure DevOps approval gate below is the
+# only sanctioned override path \u2014 reviewed in retro per
+# /architecture/test-execution-flow.md.
+- stage: ReleaseCandidate
+  displayName: Release-candidate validation (staging)
+  dependsOn: [ApiTests, UiTests]
+  condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  jobs:
+  - deployment: rc
+    environment: staging        # \u2190 Azure DevOps "Environment" with required approvals
+    pool:
+      vmImage: ubuntu-latest
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - script: echo "Promote artefact + run RC suite \u2014 see test-execution-flow.md \u00a75"
+            displayName: Run release-candidate subset on staging

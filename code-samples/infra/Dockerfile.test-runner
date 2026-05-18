@@ -1,0 +1,42 @@
+# Test runner image for the QA platform.
+#
+# A single image, parameterised by the shard index and target environment.
+# CI runs N copies of this image in parallel, each handling a slice of the
+# test suite. See /architecture/test-execution-flow.md.
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
+WORKDIR /src
+
+# Copy only what we need to restore first \u2014 better layer caching when
+# only source changes between builds.
+COPY QaPlatform.Samples.sln ./
+COPY src/QaPlatform.Core/QaPlatform.Core.csproj            src/QaPlatform.Core/
+COPY src/QaPlatform.ApiClient/QaPlatform.ApiClient.csproj  src/QaPlatform.ApiClient/
+COPY src/QaPlatform.TestData/QaPlatform.TestData.csproj    src/QaPlatform.TestData/
+COPY src/QaPlatform.Ui/QaPlatform.Ui.csproj                src/QaPlatform.Ui/
+COPY tests/QaPlatform.ApiTests/QaPlatform.ApiTests.csproj  tests/QaPlatform.ApiTests/
+COPY tests/QaPlatform.UiTests/QaPlatform.UiTests.csproj    tests/QaPlatform.UiTests/
+RUN dotnet restore QaPlatform.Samples.sln
+
+COPY . .
+RUN dotnet build QaPlatform.Samples.sln --no-restore -c Release
+
+# ----------------------------------------------------------------------------
+
+FROM mcr.microsoft.com/dotnet/sdk:8.0 AS runner
+WORKDIR /tests
+COPY --from=build /src ./
+
+# Default values \u2014 overridden by the CI pipeline per shard.
+ENV QA_ENVIRONMENT=Local \
+    SHARD_INDEX=0 \
+    SHARD_TOTAL=1
+
+# Deterministic shard distribution: a test is owned by shard N iff
+# hash(FullyQualifiedName) % SHARD_TOTAL == SHARD_INDEX. The filter is
+# computed by the entrypoint script so the framework code stays unaware
+# of CI plumbing.
+COPY infra/run-shard.sh /usr/local/bin/run-shard
+RUN chmod +x /usr/local/bin/run-shard
+
+ENTRYPOINT ["/usr/local/bin/run-shard"]
